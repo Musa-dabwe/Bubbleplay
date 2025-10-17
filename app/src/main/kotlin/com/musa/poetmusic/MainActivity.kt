@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -46,6 +47,7 @@ class MainActivity : AppCompatActivity() {
 
     private var isShuffleEnabled = false
     private var currentMediaId: String? = null
+    private var repeatMode = ExoPlayer.REPEAT_MODE_OFF
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateProgressRunnable = Runnable {
@@ -79,6 +81,14 @@ class MainActivity : AppCompatActivity() {
     private fun setupExoPlayer() {
         player = ExoPlayer.Builder(this).build()
         mediaSession = MediaSession.Builder(this, player).build()
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED) {
+                    isPlaying = false
+                    btnPlayPause.setImageResource(R.drawable.ic_play)
+                }
+            }
+        })
     }
 
     private fun loadSongs() {
@@ -94,9 +104,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         recyclerViewSongs.layoutManager = LinearLayoutManager(this)
-        adapter = SongAdapter(songs) { song ->
+        adapter = SongAdapter(songs, { song ->
             playSong(song)
-        }
+        }, null)
         recyclerViewSongs.adapter = adapter
     }
 
@@ -130,11 +140,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnRepeat.setOnClickListener {
-            player.repeatMode = if (player.repeatMode == ExoPlayer.REPEAT_MODE_ONE) {
-                ExoPlayer.REPEAT_MODE_OFF
-            } else {
-                ExoPlayer.REPEAT_MODE_ONE
+            repeatMode = when (repeatMode) {
+                ExoPlayer.REPEAT_MODE_OFF -> ExoPlayer.REPEAT_MODE_ALL
+                ExoPlayer.REPEAT_MODE_ALL -> ExoPlayer.REPEAT_MODE_ONE
+                ExoPlayer.REPEAT_MODE_ONE -> ExoPlayer.REPEAT_MODE_OFF
+                else -> ExoPlayer.REPEAT_MODE_OFF
             }
+            player.repeatMode = repeatMode
             updateRepeatIcon()
         }
 
@@ -148,7 +160,7 @@ class MainActivity : AppCompatActivity() {
                 shuffledSongs = songs.toMutableList()
             }
 
-            adapter = SongAdapter(getCurrentPlaylist()) { song -> playSong(song) }
+            adapter = SongAdapter(getCurrentPlaylist(), { song -> playSong(song) }, currentSong?.id)
             recyclerViewSongs.adapter = adapter
 
             val newIndex = getCurrentPlaylist().indexOf(currentSong)
@@ -172,6 +184,9 @@ class MainActivity : AppCompatActivity() {
         isPlaying = true
         btnPlayPause.setImageResource(R.drawable.ic_pause)
         startProgressUpdate()
+
+        // Highlight currently playing song
+        adapter.updateNowPlaying(song.id)
     }
 
     private fun pauseSong() {
@@ -204,10 +219,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateRepeatIcon() {
-        btnRepeat.setImageResource(
-            if (player.repeatMode == ExoPlayer.REPEAT_MODE_ONE) R.drawable.ic_repeat_on
-            else R.drawable.ic_repeat
-        )
+        val icon = when (repeatMode) {
+            ExoPlayer.REPEAT_MODE_ALL -> R.drawable.ic_repeat_all_on
+            ExoPlayer.REPEAT_MODE_ONE -> R.drawable.ic_repeat_one_on
+            else -> R.drawable.ic_repeat // off
+        }
+        btnRepeat.setImageResource(icon)
     }
 
     private fun updateShuffleIcon() {
