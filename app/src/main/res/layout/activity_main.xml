@@ -1,137 +1,158 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#1E1E1E"
-    android:padding="16dp">
+    android:background="#1E1E1E">
 
-    <!-- Search Bar -->
-    <com.google.android.material.textfield.TextInputLayout
+    <!-- Main Content -->
+    <LinearLayout
+        android:id="@+id/mainContent"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="24dp"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/searchPlaylist"
+        <!-- Search Bar -->
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Search Playlist"
-            android:drawableStart="@drawable/ic_search"
-            android:drawablePadding="8dp"
-            android:padding="12dp"
-            android:textColorHint="#FFFFFF"
+            android:layout_marginBottom="24dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/searchPlaylist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Search Playlist"
+                android:drawableStart="@drawable/ic_search"
+                android:drawablePadding="8dp"
+                android:padding="12dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#FFFFFF"
+                android:background="@drawable/search_bg" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Album Art -->
+        <ImageView
+            android:id="@+id/albumArt"
+            android:layout_width="300dp"
+            android:layout_height="300dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="24dp"
+            android:src="@drawable/album_art_placeholder"
+            android:scaleType="fitXY"
+            android:contentDescription="Album Art" />
+
+        <!-- Song Title (now on top) -->
+        <TextView
+            android:id="@+id/songTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="4dp"
+            android:text="I'm The Sinner"
+            android:textSize="20sp"
             android:textColor="#FFFFFF"
-            android:background="@drawable/search_bg" />
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:maxWidth="600dp" />
 
-    </com.google.android.material.textfield.TextInputLayout>
+        <!-- Artist Name (now below title) -->
+        <TextView
+            android:id="@+id/artistName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="Jared Benjamin"
+            android:textSize="16sp"
+            android:textColor="#AAAAAA"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:maxWidth="600dp"
+            android:layout_marginBottom="24dp" />
 
-    <!-- Album Art -->
-    <ImageView
-        android:id="@+id/albumArt"
-        android:layout_width="300dp"
-        android:layout_height="300dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="24dp"
-        android:src="@drawable/album_art_placeholder"
-        android:scaleType="fitXY"
-        android:contentDescription="Album Art" />
+        <!-- Control Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_marginBottom="24dp">
 
-    <!-- Song Title (now on top) -->
-    <TextView
-        android:id="@+id/songTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="4dp"
-        android:text="I'm The Sinner"
-        android:textSize="20sp"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:maxWidth="600dp" />
+            <ImageButton
+                android:id="@+id/btnRepeat"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/button_ripple_teal"
+                android:src="@drawable/ic_repeat"
+                android:tint="#FFFFFF"
+                android:contentDescription="Repeat" />
 
-    <!-- Artist Name (now below title) -->
-    <TextView
-        android:id="@+id/artistName"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:text="Jared Benjamin"
-        android:textSize="16sp"
-        android:textColor="#AAAAAA"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:maxWidth="600dp"
-        android:layout_marginBottom="24dp" />
+            <ImageButton
+                android:id="@+id/btnPrevious"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/button_ripple_teal"
+                android:src="@drawable/ic_previous"
+                android:tint="#FFFFFF"
+                android:contentDescription="Previous" />
 
-    <!-- Control Buttons -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:layout_marginBottom="24dp">
+            <ImageButton
+                android:id="@+id/btnPlayPause"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/button_ripple_teal_circle"
+                android:src="@drawable/ic_play"
+                android:tint="#FFFFFF"
+                android:contentDescription="Play/Pause" />
 
-        <ImageButton
-            android:id="@+id/btnRepeat"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/button_ripple_teal"
-            android:src="@drawable/ic_repeat"
-            android:tint="#FFFFFF"
-            android:contentDescription="Repeat" />
+            <ImageButton
+                android:id="@+id/btnNext"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/button_ripple_teal"
+                android:src="@drawable/ic_next"
+                android:tint="#FFFFFF"
+                android:contentDescription="Next" />
 
-        <ImageButton
-            android:id="@+id/btnPrevious"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/button_ripple_teal"
-            android:src="@drawable/ic_previous"
-            android:tint="#FFFFFF"
-            android:contentDescription="Previous" />
+            <ImageButton
+                android:id="@+id/btnShuffle"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="@drawable/button_ripple_teal"
+                android:src="@drawable/ic_shuffle"
+                android:tint="#FFFFFF"
+                android:contentDescription="Shuffle" />
 
-        <ImageButton
-            android:id="@+id/btnPlayPause"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/button_ripple_teal_circle"
-            android:src="@drawable/ic_play"
-            android:tint="#FFFFFF"
-            android:contentDescription="Play/Pause" />
+        </LinearLayout>
 
-        <ImageButton
-            android:id="@+id/btnNext"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/button_ripple_teal"
-            android:src="@drawable/ic_next"
-            android:tint="#FFFFFF"
-            android:contentDescription="Next" />
-
-        <ImageButton
-            android:id="@+id/btnShuffle"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:background="@drawable/button_ripple_teal"
-            android:src="@drawable/ic_shuffle"
-            android:tint="#FFFFFF"
-            android:contentDescription="Shuffle" />
+        <!-- Song List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewSongs"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:scrollbars="vertical" />
 
     </LinearLayout>
 
-    <!-- Song List -->
+    <!-- Search Results Overlay (Phantom Window) -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerViewSongs"
+        android:id="@+id/searchResultsOverlay"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="300dp"
+        android:layout_marginTop="80dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="#2A2A2A"
+        android:visibility="gone"
+        android:elevation="8dp"
         android:scrollbars="vertical" />
 
-</LinearLayout>
+</FrameLayout>
