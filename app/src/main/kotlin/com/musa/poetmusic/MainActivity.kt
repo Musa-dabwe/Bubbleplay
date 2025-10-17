@@ -11,6 +11,7 @@ import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
@@ -78,6 +79,7 @@ class MainActivity : AppCompatActivity() {
         setupExoPlayer()
         setupRecyclerView()
         setupControls()
+        setupProgressBarSeeking()
         requestPermission()
 
         val rootView = findViewById<View>(android.R.id.content)
@@ -233,6 +235,11 @@ class MainActivity : AppCompatActivity() {
             if (newIndex != -1) {
                 recyclerViewSongs.scrollToPosition(newIndex)
             }
+
+            val message = if (isShuffleEnabled) "Shuffle on" else "Shuffle off"
+            val toast = Toast.makeText(this, message, Toast.LENGTH_SHORT)
+            toast.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, 120)
+            toast.show()
         }
     }
 
@@ -372,5 +379,32 @@ class MainActivity : AppCompatActivity() {
     private fun View.hideKeyboard() {
         val inputMethodManager = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         inputMethodManager.hideSoftInputFromWindow(windowToken, 0)
+    }
+
+    private fun setupProgressBarSeeking() {
+        progressBar.setOnTouchListener { _, event ->
+            if (player.duration <= 0) return@setOnTouchListener false
+
+            val x = event.x
+            val width = progressBar.width.toFloat()
+            if (width <= 0) return@setOnTouchListener false
+
+            val progress = (x / width).coerceIn(0f, 1f)
+            val newPosition = (progress * player.duration).toLong()
+
+            when (event.action) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    // Optional: show preview (not implemented here)
+                }
+                MotionEvent.ACTION_UP -> {
+                    player.seekTo(newPosition)
+                    // Resume playback if it was playing
+                    if (isPlaying) {
+                        player.play()
+                    }
+                }
+            }
+            true // consume touch
+        }
     }
 }
