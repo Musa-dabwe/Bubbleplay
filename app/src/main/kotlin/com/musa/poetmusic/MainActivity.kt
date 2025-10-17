@@ -1,24 +1,30 @@
 package com.musa.poetmusic
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
+import androidx.media3.session.MediaSession
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var player: ExoPlayer
-    private lateinit var currentSong: Song
+    private var currentSong: Song? = null
     private var isPlaying = false
 
     // UI Elements
@@ -35,6 +41,7 @@ class MainActivity : AppCompatActivity() {
 
     private val songs = mutableListOf<Song>()
     private lateinit var adapter: SongAdapter
+    private lateinit var mediaSession: MediaSession
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateProgressRunnable = Runnable {
@@ -43,47 +50,42 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(com.musa.poetmusic.R.layout.activity_main)
+        setContentView(R.layout.activity_main)
 
         setupUI()
         setupExoPlayer()
-        setupSongs()
         setupRecyclerView()
         setupControls()
+        requestPermission()
     }
 
     private fun setupUI() {
-        searchPlaylist = findViewById(com.musa.poetmusic.R.id.searchPlaylist)
-        albumArt = findViewById(com.musa.poetmusic.R.id.albumArt)
-        artistName = findViewById(com.musa.poetmusic.R.id.artistName)
-        songTitle = findViewById(com.musa.poetmusic.R.id.songTitle)
-        btnPlayPause = findViewById(com.musa.poetmusic.R.id.btnPlayPause)
-        btnPrevious = findViewById(com.musa.poetmusic.R.id.btnPrevious)
-        btnNext = findViewById(com.musa.poetmusic.R.id.btnNext)
-        btnRepeat = findViewById(com.musa.poetmusic.R.id.btnRepeat)
-        btnShuffle = findViewById(com.musa.poetmusic.R.id.btnShuffle)
-        recyclerViewSongs = findViewById(com.musa.poetmusic.R.id.recyclerViewSongs)
+        searchPlaylist = findViewById(R.id.searchPlaylist)
+        albumArt = findViewById(R.id.albumArt)
+        artistName = findViewById(R.id.artistName)
+        songTitle = findViewById(R.id.songTitle)
+        btnPlayPause = findViewById(R.id.btnPlayPause)
+        btnPrevious = findViewById(R.id.btnPrevious)
+        btnNext = findViewById(R.id.btnNext)
+        btnRepeat = findViewById(R.id.btnRepeat)
+        btnShuffle = findViewById(R.id.btnShuffle)
+        recyclerViewSongs = findViewById(R.id.recyclerViewSongs)
     }
 
     private fun setupExoPlayer() {
         player = ExoPlayer.Builder(this).build()
-        // You can optionally add PlayerView to layout if needed for progress bar
+        mediaSession = MediaSession.Builder(this, player).build()
     }
 
-    private fun setupSongs() {
-        // Mock data - replace with real data from database or API
-        repeat(5) {
-            songs.add(
-                Song(
-                    id = it + 1,
-                    title = "I'm The Sinner",
-                    artist = "Jared Benjamin",
-                    albumArtUrl = "https://via.placeholder.com/300?text=Album+Art", // Replace with actual URL or drawable
-                    audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" // Replace with actual audio URL or file path
-                )
-            )
+    private fun loadSongs() {
+        songs.clear()
+        songs.addAll(SongRepository.getAllSongs(this))
+        adapter.notifyDataSetChanged()
+
+        if (songs.isNotEmpty()) {
+            currentSong = songs[0]
+            updateSongInfo(currentSong!!)
         }
-        currentSong = songs[0]
     }
 
     private fun setupRecyclerView() {
@@ -96,29 +98,34 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupControls() {
         btnPlayPause.setOnClickListener {
-            if (isPlaying) {
-                pauseSong()
-            } else {
-                playSong(currentSong)
+            currentSong?.let {
+                if (isPlaying) {
+                    pauseSong()
+                } else {
+                    playSong(it)
+                }
             }
         }
 
         btnPrevious.setOnClickListener {
-            val currentIndex = songs.indexOf(currentSong)
-            if (currentIndex > 0) {
-                playSong(songs[currentIndex - 1])
+            currentSong?.let {
+                val currentIndex = songs.indexOf(it)
+                if (currentIndex > 0) {
+                    playSong(songs[currentIndex - 1])
+                }
             }
         }
 
         btnNext.setOnClickListener {
-            val currentIndex = songs.indexOf(currentSong)
-            if (currentIndex < songs.size - 1) {
-                playSong(songs[currentIndex + 1])
+            currentSong?.let {
+                val currentIndex = songs.indexOf(it)
+                if (currentIndex < songs.size - 1) {
+                    playSong(songs[currentIndex + 1])
+                }
             }
         }
 
         btnRepeat.setOnClickListener {
-            // Toggle repeat mode
             player.repeatMode = if (player.repeatMode == ExoPlayer.REPEAT_MODE_ONE) {
                 ExoPlayer.REPEAT_MODE_OFF
             } else {
@@ -128,34 +135,29 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnShuffle.setOnClickListener {
-            // Toggle shuffle
             player.shuffleModeEnabled = !player.shuffleModeEnabled
             updateShuffleIcon()
         }
-
-        // Update UI with current song info
-        updateSongInfo(currentSong)
     }
 
     private fun playSong(song: Song) {
         currentSong = song
         updateSongInfo(song)
 
-        // Prepare player
-        val mediaItem = MediaItem.fromUri(song.audioUrl)
+        val mediaItem = MediaItem.fromUri(Uri.parse("file://${song.audioUrl}"))
         player.setMediaItem(mediaItem)
         player.prepare()
         player.play()
 
         isPlaying = true
-        btnPlayPause.setImageResource(com.musa.poetmusic.R.drawable.ic_pause)
+        btnPlayPause.setImageResource(R.drawable.ic_pause)
         startProgressUpdate()
     }
 
     private fun pauseSong() {
         player.pause()
         isPlaying = false
-        btnPlayPause.setImageResource(com.musa.poetmusic.R.drawable.ic_play)
+        btnPlayPause.setImageResource(R.drawable.ic_play)
         stopProgressUpdate()
     }
 
@@ -164,12 +166,12 @@ class MainActivity : AppCompatActivity() {
         songTitle.text = song.title
         Glide.with(this)
             .load(song.albumArtUrl)
-            .placeholder(com.musa.poetmusic.R.drawable.album_art_placeholder)
+            .placeholder(R.drawable.album_art_placeholder)
+            .error(R.drawable.album_art_placeholder)
             .into(albumArt)
     }
 
     private fun updateProgress() {
-        // You can implement progress bar here if needed
         handler.postDelayed(updateProgressRunnable, 1000)
     }
 
@@ -183,25 +185,49 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateRepeatIcon() {
         btnRepeat.setImageResource(
-            if (player.repeatMode == ExoPlayer.REPEAT_MODE_ONE)
-                com.musa.poetmusic.R.drawable.ic_repeat_on
-            else
-                com.musa.poetmusic.R.drawable.ic_repeat
+            if (player.repeatMode == ExoPlayer.REPEAT_MODE_ONE) R.drawable.ic_repeat_on
+            else R.drawable.ic_repeat
         )
     }
 
     private fun updateShuffleIcon() {
         btnShuffle.setImageResource(
-            if (player.shuffleModeEnabled)
-                com.musa.poetmusic.R.drawable.ic_shuffle_on
-            else
-                com.musa.poetmusic.R.drawable.ic_shuffle
+            if (player.shuffleModeEnabled) R.drawable.ic_shuffle_on
+            else R.drawable.ic_shuffle
         )
+    }
+
+    private fun requestPermission() {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(permission), 100)
+        } else {
+            loadSongs()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 100 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            loadSongs()
+        } else {
+            Toast.makeText(this, "Permission required to access music", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         player.release()
+        mediaSession.release()
         stopProgressUpdate()
     }
 }

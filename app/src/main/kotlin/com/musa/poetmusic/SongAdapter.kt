@@ -32,6 +32,7 @@ class SongAdapter(private val songs: List<Song>, private val onSongClick: (Song)
         Glide.with(holder.albumArt.context)
             .load(song.albumArtUrl)
             .placeholder(com.musa.poetmusic.R.drawable.album_art_placeholder)
+            .error(com.musa.poetmusic.R.drawable.album_art_placeholder)
             .into(holder.albumArt)
 
         holder.itemView.setOnClickListener {
