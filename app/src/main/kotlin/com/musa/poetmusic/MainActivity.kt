@@ -40,8 +40,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recyclerViewSongs: RecyclerView
 
     private val songs = mutableListOf<Song>()
+    private var shuffledSongs = mutableListOf<Song>()
     private lateinit var adapter: SongAdapter
     private lateinit var mediaSession: MediaSession
+
+    private var isShuffleEnabled = false
+    private var currentMediaId: String? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateProgressRunnable = Runnable {
@@ -96,6 +100,8 @@ class MainActivity : AppCompatActivity() {
         recyclerViewSongs.adapter = adapter
     }
 
+    private fun getCurrentPlaylist(): List<Song> = if (isShuffleEnabled) shuffledSongs else songs
+
     private fun setupControls() {
         btnPlayPause.setOnClickListener {
             currentSong?.let {
@@ -108,20 +114,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnPrevious.setOnClickListener {
-            currentSong?.let {
-                val currentIndex = songs.indexOf(it)
-                if (currentIndex > 0) {
-                    playSong(songs[currentIndex - 1])
-                }
+            val playlist = getCurrentPlaylist()
+            val currentIndex = playlist.indexOf(currentSong)
+            if (currentIndex > 0) {
+                playSong(playlist[currentIndex - 1])
             }
         }
 
         btnNext.setOnClickListener {
-            currentSong?.let {
-                val currentIndex = songs.indexOf(it)
-                if (currentIndex < songs.size - 1) {
-                    playSong(songs[currentIndex + 1])
-                }
+            val playlist = getCurrentPlaylist()
+            val currentIndex = playlist.indexOf(currentSong)
+            if (currentIndex != -1 && currentIndex < playlist.size - 1) {
+                playSong(playlist[currentIndex + 1])
             }
         }
 
@@ -135,20 +139,36 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnShuffle.setOnClickListener {
-            player.shuffleModeEnabled = !player.shuffleModeEnabled
+            isShuffleEnabled = !isShuffleEnabled
             updateShuffleIcon()
+
+            if (isShuffleEnabled) {
+                shuffledSongs = songs.shuffled().toMutableList()
+            } else {
+                shuffledSongs = songs.toMutableList()
+            }
+
+            adapter = SongAdapter(getCurrentPlaylist()) { song -> playSong(song) }
+            recyclerViewSongs.adapter = adapter
+
+            val newIndex = getCurrentPlaylist().indexOf(currentSong)
+            if (newIndex != -1) {
+                recyclerViewSongs.scrollToPosition(newIndex)
+            }
         }
     }
 
     private fun playSong(song: Song) {
-        currentSong = song
-        updateSongInfo(song)
+        if (currentMediaId != song.audioUrl) {
+            currentMediaId = song.audioUrl
+            currentSong = song
+            updateSongInfo(song)
 
-        val mediaItem = MediaItem.fromUri(Uri.parse("file://${song.audioUrl}"))
-        player.setMediaItem(mediaItem)
-        player.prepare()
+            player.setMediaItem(MediaItem.fromUri(Uri.parse("file://${song.audioUrl}")))
+            player.prepare()
+        }
+
         player.play()
-
         isPlaying = true
         btnPlayPause.setImageResource(R.drawable.ic_pause)
         startProgressUpdate()
@@ -192,7 +212,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateShuffleIcon() {
         btnShuffle.setImageResource(
-            if (player.shuffleModeEnabled) R.drawable.ic_shuffle_on
+            if (isShuffleEnabled) R.drawable.ic_shuffle_on
             else R.drawable.ic_shuffle
         )
     }
