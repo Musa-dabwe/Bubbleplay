@@ -1,82 +1,103 @@
 package com.musa.bubbleplayer
 
+import android.Manifest
+import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.View
-import android.widget.Button
-import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
-
-    private lateinit var permissionText: TextView
-    private lateinit var permissionButton: Button
-
-    private val overlayPermissionLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (checkOverlayPermission()) {
-            startBubbleService()
-        } else {
-            Toast.makeText(this, "Permission denied. The floating player cannot be displayed.", Toast.LENGTH_SHORT).show()
-        }
-    }
+    private val OVERLAY_PERMISSION_REQ_CODE = 1234
+    private val NOTIFICATION_PERMISSION_REQ_CODE = 5678
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        permissionText = findViewById(R.id.permission_text)
-        permissionButton = findViewById(R.id.permission_button)
-
-        permissionButton.setOnClickListener {
-            requestOverlayPermission()
+        // Check for notification permission (required for foreground service)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQ_CODE
+                )
+                return
+            }
         }
+
+        // Check overlay permission
+        checkOverlayPermission()
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateUI()
-    }
-
-    private fun updateUI() {
-        if (checkOverlayPermission()) {
-            permissionText.text = "Permission granted! Starting the player."
-            permissionButton.visibility = View.GONE
-            startBubbleService()
-        } else {
-            permissionText.text = "This app requires permission to draw over other apps to display the floating player."
-            permissionButton.visibility = View.VISIBLE
-        }
-    }
-
-    private fun checkOverlayPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(this)
-        } else {
-            true // Overlay permission is not required before Marshmallow
-        }
-    }
-
-    private fun requestOverlayPermission() {
+    private fun checkOverlayPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            overlayPermissionLauncher.launch(intent)
-        } else {
-            startBubbleService()
+            if (!Settings.canDrawOverlays(this)) {
+                // Request overlay permission
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+                startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE)
+                return
+            }
+        }
+
+        // If we have all permissions, start the service
+        startBubbleService()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == OVERLAY_PERMISSION_REQ_CODE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Settings.canDrawOverlays(this)) {
+                    startBubbleService()
+                } else {
+                    Toast.makeText(this, "Overlay permission required!", Toast.LENGTH_LONG).show()
+                    finish()
+                }
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_REQ_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Check overlay permission next
+                checkOverlayPermission()
+            } else {
+                Toast.makeText(this, "Notification permission required!", Toast.LENGTH_LONG).show()
+                finish()
+            }
         }
     }
 
     private fun startBubbleService() {
-        if (checkOverlayPermission()) {
-            startService(Intent(this, BubbleService::class.java))
-            finish() // Close main activity after starting the service
+        try {
+            val serviceIntent = Intent(this, BubbleService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+            finish()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error starting service: " + e.message, Toast.LENGTH_LONG).show()
+            finish()
         }
     }
 }

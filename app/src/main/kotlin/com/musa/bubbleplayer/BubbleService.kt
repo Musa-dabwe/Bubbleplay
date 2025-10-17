@@ -40,10 +40,16 @@ class BubbleService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-        startForeground(1, createNotification())
-        initializePlaylist() // Load your songs here
-        createBubble()
+        try {
+            createNotificationChannel()
+            val notification = createNotification()
+            startForeground(1, notification) // This MUST be called before adding views
+            initializePlaylist()
+            createBubble()
+        } catch (e: Exception) {
+            // Log the error (you can use Log.e or show a toast)
+            stopSelf()
+        }
     }
 
     private fun createNotificationChannel() {
@@ -73,10 +79,14 @@ class BubbleService : Service() {
     }
 
     private fun createBubble() {
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        // Add null check
+        if (!this::windowManager.isInitialized) {
+            windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        }
 
-        // Create bubble view
-        bubbleView = LayoutInflater.from(this).inflate(R.layout.bubble_layout, null)
+        try {
+            // Create bubble view
+            bubbleView = LayoutInflater.from(this).inflate(R.layout.bubble_layout, null)
         val albumArt = bubbleView.findViewById<ImageView>(R.id.album_art)
         albumArt.setImageResource(R.drawable.default_album) // Set default album art
 
@@ -151,6 +161,12 @@ class BubbleService : Service() {
         })
 
         windowManager.addView(bubbleView, bubbleParams)
+        } catch (e: SecurityException) {
+            // Overlay permission was revoked
+            stopSelf()
+        } catch (e: Exception) {
+            stopSelf()
+        }
     }
 
     private fun expandPlayer() {
