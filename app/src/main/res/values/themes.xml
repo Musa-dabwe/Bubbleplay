@@ -1,9 +1,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
   <!-- Base application theme. -->
-  <style name="Base.AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
-    <!-- Customize your theme here. -->
-    <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+  <style name="Theme.PoetMusic" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Make status bar transparent -->
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:windowLightStatusBar">false</item> <!-- Keep icons white -->
   </style>
-
-  <style name="AppTheme" parent="Base.AppTheme" />
 </resources>

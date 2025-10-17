@@ -15,11 +15,13 @@ import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -48,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recyclerViewSongs: RecyclerView
     private lateinit var searchResultsOverlay: RecyclerView
     private lateinit var searchResultsAdapter: SongAdapter
+    private lateinit var progressBar: ProgressBar
 
     private val allSongs = mutableListOf<Song>()
     private var shuffledSongs = mutableListOf<Song>()
@@ -59,12 +62,16 @@ class MainActivity : AppCompatActivity() {
     private var repeatMode = ExoPlayer.REPEAT_MODE_OFF
 
     private val handler = Handler(Looper.getMainLooper())
-    private val updateProgressRunnable = Runnable {
-        updateProgress()
+    private val updateProgressRunnable = object : Runnable {
+        override fun run() {
+            updateProgress()
+            handler.postDelayed(this, 1000)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_main)
 
         setupUI()
@@ -89,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         btnShuffle = findViewById(R.id.btnShuffle)
         recyclerViewSongs = findViewById(R.id.recyclerViewSongs)
         searchResultsOverlay = findViewById(R.id.searchResultsOverlay)
+        progressBar = findViewById(R.id.progressBar)
     }
 
     private fun setupExoPlayer() {
@@ -96,9 +104,16 @@ class MainActivity : AppCompatActivity() {
         mediaSession = MediaSession.Builder(this, player).build()
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_ENDED) {
-                    isPlaying = false
-                    btnPlayPause.setImageResource(R.drawable.ic_play)
+                when (state) {
+                    Player.STATE_READY -> {
+                        startProgressUpdate()
+                    }
+                    Player.STATE_ENDED -> {
+                        stopProgressUpdate()
+                        progressBar.progress = 0
+                        isPlaying = false
+                        btnPlayPause.setImageResource(R.drawable.ic_play)
+                    }
                 }
             }
         })
@@ -234,6 +249,7 @@ class MainActivity : AppCompatActivity() {
         player.play()
         isPlaying = true
         btnPlayPause.setImageResource(R.drawable.ic_pause)
+        progressBar.progress = 0
         startProgressUpdate()
 
         adapter.updateNowPlaying(song.id)
@@ -257,7 +273,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateProgress() {
-        handler.postDelayed(updateProgressRunnable, 1000)
+        if (player.isPlaying) {
+            val duration = player.duration
+            val current = player.currentPosition
+            if (duration > 0) {
+                val progress = (current * 100 / duration).toInt()
+                progressBar.progress = progress
+            }
+        }
     }
 
     private fun startProgressUpdate() {
