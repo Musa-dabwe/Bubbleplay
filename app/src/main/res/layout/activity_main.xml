@@ -80,7 +80,7 @@
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/button_bg"
+            android:background="@drawable/button_ripple_teal"
             android:src="@drawable/ic_repeat"
             android:tint="#FFFFFF"
             android:contentDescription="Repeat" />
@@ -90,7 +90,7 @@
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/button_bg"
+            android:background="@drawable/button_ripple_teal"
             android:src="@drawable/ic_previous"
             android:tint="#FFFFFF"
             android:contentDescription="Previous" />
@@ -100,7 +100,7 @@
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/button_bg_circle"
+            android:background="@drawable/button_ripple_teal_circle"
             android:src="@drawable/ic_play"
             android:tint="#FFFFFF"
             android:contentDescription="Play/Pause" />
@@ -110,7 +110,7 @@
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/button_bg"
+            android:background="@drawable/button_ripple_teal"
             android:src="@drawable/ic_next"
             android:tint="#FFFFFF"
             android:contentDescription="Next" />
@@ -119,7 +119,7 @@
             android:id="@+id/btnShuffle"
             android:layout_width="56dp"
             android:layout_height="56dp"
-            android:background="@drawable/button_bg"
+            android:background="@drawable/button_ripple_teal"
             android:src="@drawable/ic_shuffle"
             android:tint="#FFFFFF"
             android:contentDescription="Shuffle" />

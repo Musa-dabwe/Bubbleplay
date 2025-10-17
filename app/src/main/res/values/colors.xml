@@ -3,4 +3,5 @@
     <color name="playing_text_color">#00FFCC</color>
     <color name="default_text_color">#FFFFFF</color>
     <color name="default_artist_color">#AAAAAA</color>
+    <color name="teal_ripple">#00FFCC</color>
 </resources>

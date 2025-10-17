@@ -219,12 +219,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateRepeatIcon() {
-        val icon = when (repeatMode) {
-            ExoPlayer.REPEAT_MODE_ALL -> R.drawable.ic_repeat_all_on
-            ExoPlayer.REPEAT_MODE_ONE -> R.drawable.ic_repeat_one_on
-            else -> R.drawable.ic_repeat // off
+        val (icon, message) = when (repeatMode) {
+            ExoPlayer.REPEAT_MODE_ALL -> {
+                R.drawable.ic_repeat_all_on to "Repeat all"
+            }
+            ExoPlayer.REPEAT_MODE_ONE -> {
+                R.drawable.ic_repeat_one_on to "Repeat one"
+            }
+            else -> {
+                R.drawable.ic_repeat to "Repeat off"
+            }
         }
         btnRepeat.setImageResource(icon)
+
+        // Show toast at bottom center
+        val toast = Toast.makeText(this, message, Toast.LENGTH_SHORT)
+        toast.setGravity(android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL, 0, 120) // 120px from bottom
+        toast.show()
     }
 
     private fun updateShuffleIcon() {
