@@ -39,26 +39,33 @@
         android:scaleType="fitXY"
         android:contentDescription="Album Art" />
 
-    <!-- Artist & Title -->
+    <!-- Song Title (now on top) -->
+    <TextView
+        android:id="@+id/songTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="4dp"
+        android:text="I'm The Sinner"
+        android:textSize="20sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:maxWidth="600dp" />
+
+    <!-- Artist Name (now below title) -->
     <TextView
         android:id="@+id/artistName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:text="Jared Benjamin"
-        android:textSize="24sp"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:layout_marginBottom="4dp" />
-
-    <TextView
-        android:id="@+id/songTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:text="I'm The Sinner"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:textColor="#AAAAAA"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:maxWidth="600dp"
         android:layout_marginBottom="24dp" />
 
     <!-- Control Buttons -->
