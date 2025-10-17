@@ -3,6 +3,9 @@ package com.musa.poetmusic
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -81,6 +84,7 @@ class MainActivity : AppCompatActivity() {
         setupControls()
         setupProgressBarSeeking()
         requestPermission()
+        setupProgressUpdates()
 
         val rootView = findViewById<View>(android.R.id.content)
         rootView.setupHideKeyboardOnTouch()
@@ -104,21 +108,6 @@ class MainActivity : AppCompatActivity() {
     private fun setupExoPlayer() {
         player = ExoPlayer.Builder(this).build()
         mediaSession = MediaSession.Builder(this, player).build()
-        player.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(state: Int) {
-                when (state) {
-                    Player.STATE_READY -> {
-                        startProgressUpdate()
-                    }
-                    Player.STATE_ENDED -> {
-                        stopProgressUpdate()
-                        progressBar.progress = 0
-                        isPlaying = false
-                        btnPlayPause.setImageResource(R.drawable.ic_play)
-                    }
-                }
-            }
-        })
     }
 
     private fun loadSongs() {
@@ -253,11 +242,14 @@ class MainActivity : AppCompatActivity() {
             player.prepare()
         }
 
-        player.play()
-        isPlaying = true
-        btnPlayPause.setImageResource(R.drawable.ic_pause)
-        progressBar.progress = 0
-        startProgressUpdate()
+        requestAudioFocus()
+
+        if (audioFocusGranted) {
+            player.play()
+            isPlaying = true
+            btnPlayPause.setImageResource(R.drawable.ic_pause)
+            // progress updates handled by listener
+        }
 
         adapter.updateNowPlaying(song.id)
     }
@@ -361,6 +353,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupProgressUpdates() {
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                when (state) {
+                    Player.STATE_READY -> {
+                        // Start updating progress only when ready
+                        startProgressUpdate()
+                    }
+                    Player.STATE_ENDED -> {
+                        stopProgressUpdate()
+                        progressBar.progress = 0
+                    }
+                    else -> {
+                        stopProgressUpdate()
+                    }
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    startProgressUpdate()
+                } else {
+                    stopProgressUpdate()
+                }
+            }
+        })
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         player.release()
@@ -406,5 +426,64 @@ class MainActivity : AppCompatActivity() {
             }
             true // consume touch
         }
+    }
+
+    private lateinit var audioManager: AudioManager
+    private var audioFocusGranted = false
+
+    @Suppress("DEPRECATION")
+    private fun requestAudioFocus() {
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val focusResult: Int
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val playbackAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+
+            val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(playbackAttributes)
+                .setOnAudioFocusChangeListener { focusChange ->
+                    when (focusChange) {
+                        AudioManager.AUDIOFOCUS_LOSS,
+                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                            if (player.isPlaying) {
+                                player.pause()
+                                isPlaying = false
+                                btnPlayPause.setImageResource(R.drawable.ic_play)
+                            }
+                        }
+                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                            // Optional: lower volume instead of pausing
+                        }
+                        AudioManager.AUDIOFOCUS_GAIN -> {
+                            // Resume if paused due to transient loss
+                        }
+                    }
+                }
+                .build()
+            focusResult = audioManager.requestAudioFocus(focusRequest)
+        } else {
+            focusResult = audioManager.requestAudioFocus(
+                { focusChange ->
+                    when (focusChange) {
+                        AudioManager.AUDIOFOCUS_LOSS,
+                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                            if (player.isPlaying) {
+                                player.pause()
+                                isPlaying = false
+                                btnPlayPause.setImageResource(R.drawable.ic_play)
+                            }
+                        }
+                        AudioManager.AUDIOFOCUS_GAIN -> { }
+                    }
+                },
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
+        }
+
+        audioFocusGranted = (focusResult == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
     }
 }
