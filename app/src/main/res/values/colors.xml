@@ -1,2 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources></resources>
+<resources>
+    <color name="playing_text_color">#00FFCC</color>
+    <color name="default_text_color">#FFFFFF</color>
+    <color name="default_artist_color">#AAAAAA</color>
+</resources>
