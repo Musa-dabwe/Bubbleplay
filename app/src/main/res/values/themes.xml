@@ -3,8 +3,6 @@
   <style name="Theme.PoetMusic" parent="Theme.Material3.DayNight.NoActionBar">
     <!-- Make status bar transparent -->
     <item name="android:statusBarColor">@android:color/transparent</item>
-    <item name="android:windowLightStatusBar">false</item> <!-- White icons for dark background -->
-    <!-- Optional: Hide navigation bar if needed -->
-    <!-- <item name="android:navigationBarColor">@android:color/transparent</item> -->
+    <item name="android:windowLightStatusBar">false</item> <!-- Keep icons white -->
   </style>
 </resources>
