@@ -1,18 +1,15 @@
-<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Background track -->
     <item android:id="@android:id/background">
         <shape android:shape="rectangle">
             <solid android:color="#444444" />
-            <corners android:radius="10dp" />
+            <corners android:radius="7.5dp" />
         </shape>
     </item>
-    <!-- Progress track -->
     <item android:id="@android:id/progress">
         <clip>
             <shape android:shape="rectangle">
-                <solid android:color="#00FFCC" /> <!-- Teal green -->
-                <corners android:radius="10dp" />
+                <solid android:color="#00FFCC" />
+                <corners android:radius="7.5dp" />
             </shape>
         </clip>
     </item>

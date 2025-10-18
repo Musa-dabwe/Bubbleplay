@@ -74,16 +74,13 @@
             android:maxWidth="600dp"
             android:layout_marginBottom="24dp" />
 
-    <!-- Progress Bar -->
     <ProgressBar
         android:id="@+id/progressBar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="600dp"
-        android:layout_height="20dp"
+        android:layout_height="15dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="24dp"
-        android:max="100"
-        android:progress="0"
         android:progressDrawable="@drawable/progress_drawable"
         android:indeterminate="false" />
 
