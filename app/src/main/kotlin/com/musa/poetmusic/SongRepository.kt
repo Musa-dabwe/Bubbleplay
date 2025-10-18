@@ -15,10 +15,11 @@ object SongRepository {
             MediaStore.Audio.Media.DATA // file path
         )
 
+        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
         val cursor = context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             projection,
-            null,
+            selection,
             null,
             "${MediaStore.Audio.Media.TITLE} ASC"
         )

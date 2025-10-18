@@ -20,13 +20,9 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import android.widget.LinearLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.updatePadding
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -79,18 +75,15 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_main)
 
-        // Apply padding to main content so it doesn't clip under status bar
-        val mainContent = findViewById<LinearLayout>(R.id.mainContent)
-        ViewCompat.setOnApplyWindowInsetsListener(mainContent) { view, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(top = systemBars.top)
-            insets
-        }
-
         setupUI()
         setupExoPlayer()
+        setupRecyclerView()
+        setupControls()
         setupProgressBarSeeking()
         requestPermission()
+
+        val rootView = findViewById<View>(android.R.id.content)
+        rootView.setupHideKeyboardOnTouch()
     }
 
     private fun setupUI() {
@@ -120,15 +113,9 @@ class MainActivity : AppCompatActivity() {
                     Player.STATE_ENDED -> {
                         stopProgressUpdate()
                         progressBar.progress = 0
+                        isPlaying = false
+                        btnPlayPause.setImageResource(R.drawable.ic_play)
                     }
-                }
-            }
-
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) {
-                    startProgressUpdate()
-                } else {
-                    stopProgressUpdate()
                 }
             }
         })
@@ -137,9 +124,13 @@ class MainActivity : AppCompatActivity() {
     private fun loadSongs() {
         allSongs.clear()
         allSongs.addAll(SongRepository.getAllSongs(this))
-        shuffledSongs = allSongs.toMutableList()
-        adapter = SongAdapter(allSongs, ::playSong, null)
-        recyclerViewSongs.adapter = adapter
+        adapter.notifyDataSetChanged()
+
+        if (allSongs.isNotEmpty()) {
+            currentSong = allSongs[0]
+            updateSongInfo(currentSong!!)
+        }
+        setupSearch()
     }
 
     private fun setupRecyclerView() {
@@ -200,8 +191,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        btnNext.setOnClickListener { player.seekToNext() }
-        btnPrevious.setOnClickListener { player.seekToPrevious() }
+        btnPrevious.setOnClickListener {
+            val playlist = getCurrentPlaylist()
+            val currentIndex = playlist.indexOf(currentSong)
+            if (currentIndex > 0) {
+                playSong(playlist[currentIndex - 1])
+            }
+        }
+
+        btnNext.setOnClickListener {
+            val playlist = getCurrentPlaylist()
+            val currentIndex = playlist.indexOf(currentSong)
+            if (currentIndex != -1 && currentIndex < playlist.size - 1) {
+                playSong(playlist[currentIndex + 1])
+            }
+        }
 
         btnRepeat.setOnClickListener {
             repeatMode = when (repeatMode) {
@@ -217,49 +221,45 @@ class MainActivity : AppCompatActivity() {
         btnShuffle.setOnClickListener {
             isShuffleEnabled = !isShuffleEnabled
             updateShuffleIcon()
+
             if (isShuffleEnabled) {
                 shuffledSongs = allSongs.shuffled().toMutableList()
             } else {
                 shuffledSongs = allSongs.toMutableList()
             }
-            adapter = SongAdapter(getCurrentPlaylist(), ::playSong, null)
+
+            adapter = SongAdapter(getCurrentPlaylist(), { song -> playSong(song) }, currentSong?.id)
             recyclerViewSongs.adapter = adapter
-            // Re-prepare playlist if needed
-            preparePlaylist()
-            val toast = Toast.makeText(this, if (isShuffleEnabled) "Shuffle on" else "Shuffle off", Toast.LENGTH_SHORT)
+
+            val newIndex = getCurrentPlaylist().indexOf(currentSong)
+            if (newIndex != -1) {
+                recyclerViewSongs.scrollToPosition(newIndex)
+            }
+
+            val message = if (isShuffleEnabled) "Shuffle on" else "Shuffle off"
+            val toast = Toast.makeText(this, message, Toast.LENGTH_SHORT)
             toast.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, 120)
             toast.show()
         }
     }
 
-    private fun preparePlaylist() {
-        val mediaItems = getCurrentPlaylist().map { song ->
-            MediaItem.fromUri(song.audioUrl)
-        }
-        player.setMediaItems(mediaItems)
-        player.prepare()
-    }
-
     private fun playSong(song: Song) {
-        if (currentSong == song && player.playbackState != Player.STATE_IDLE) {
-            // Already playing this song → resume
-            player.play()
-            isPlaying = true
-            btnPlayPause.setImageResource(R.drawable.ic_pause)
-            startProgressUpdate()
-            return
+        if (currentMediaId != song.audioUrl) {
+            currentMediaId = song.audioUrl
+            currentSong = song
+            updateSongInfo(song)
+
+            player.setMediaItem(MediaItem.fromUri(Uri.parse("file://${song.audioUrl}")))
+            player.prepare()
         }
-        // New song → prepare and play
-        currentSong = song
-        updateSongInfo(song)
-        adapter.updateNowPlaying(song.id)
-        val mediaItem = MediaItem.fromUri(song.audioUrl)
-        player.setMediaItem(mediaItem)
-        player.prepare()
+
         player.play()
         isPlaying = true
         btnPlayPause.setImageResource(R.drawable.ic_pause)
+        progressBar.progress = 0
         startProgressUpdate()
+
+        adapter.updateNowPlaying(song.id)
     }
 
     private fun pauseSong() {
@@ -280,9 +280,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateProgress() {
-        if (player.duration > 0 && player.isPlaying) {
-            val progress = (player.currentPosition * 100 / player.duration).toInt()
-            progressBar.progress = progress
+        if (player.isPlaying) {
+            val duration = player.duration
+            val current = player.currentPosition
+            if (duration > 0) {
+                val progress = (current * 100 / duration).toInt()
+                progressBar.progress = progress
+            }
         }
     }
 
