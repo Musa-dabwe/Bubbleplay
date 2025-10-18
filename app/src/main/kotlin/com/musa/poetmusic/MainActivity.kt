@@ -16,15 +16,13 @@ import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.updatePadding
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -53,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recyclerViewSongs: RecyclerView
     private lateinit var searchResultsOverlay: RecyclerView
     private lateinit var searchResultsAdapter: SongAdapter
+    private lateinit var progressBar: ProgressBar
 
     private val allSongs = mutableListOf<Song>()
     private var shuffledSongs = mutableListOf<Song>()
@@ -64,6 +63,12 @@ class MainActivity : AppCompatActivity() {
     private var repeatMode = ExoPlayer.REPEAT_MODE_OFF
 
     private val handler = Handler(Looper.getMainLooper())
+    private val updateProgressRunnable = object : Runnable {
+        override fun run() {
+            updateProgress()
+            handler.postDelayed(this, 1000)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +79,7 @@ class MainActivity : AppCompatActivity() {
         setupExoPlayer()
         setupRecyclerView()
         setupControls()
+        setupProgressBarSeeking()
         requestPermission()
 
         val rootView = findViewById<View>(android.R.id.content)
@@ -92,17 +98,35 @@ class MainActivity : AppCompatActivity() {
         btnShuffle = findViewById(R.id.btnShuffle)
         recyclerViewSongs = findViewById(R.id.recyclerViewSongs)
         searchResultsOverlay = findViewById(R.id.searchResultsOverlay)
+        progressBar = findViewById(R.id.progressBar)
     }
 
     private fun setupExoPlayer() {
         player = ExoPlayer.Builder(this).build()
         mediaSession = MediaSession.Builder(this, player).build()
         player.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                super.onMediaItemTransition(mediaItem, reason)
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
+                    val currentIndex = player.currentMediaItemIndex
+                    val playlist = getCurrentPlaylist()
+                    if (currentIndex in playlist.indices) {
+                        val newSong = playlist[currentIndex]
+                        currentSong = newSong
+                        updateSongInfo(newSong)
+                        adapter.updateNowPlaying(newSong.id)
+                        // Progress bar will auto-update via existing listener
+                    }
+                }
+            }
+
             override fun onPlaybackStateChanged(state: Int) {
                 when (state) {
                     Player.STATE_ENDED -> {
+                        // Only happens if REPEAT_MODE_OFF and last song ends
                         isPlaying = false
                         btnPlayPause.setImageResource(R.drawable.ic_play)
+                        stopProgressUpdate()
                     }
                 }
             }
@@ -112,13 +136,17 @@ class MainActivity : AppCompatActivity() {
     private fun loadSongs() {
         allSongs.clear()
         allSongs.addAll(SongRepository.getAllSongs(this))
-        adapter.notifyDataSetChanged()
-
+        // Reset shuffled list
+        shuffledSongs = allSongs.toMutableList()
+        // Setup adapters
+        adapter = SongAdapter(getCurrentPlaylist(), ::playSong, null)
+        recyclerViewSongs.adapter = adapter
+        // ⚠️ CRITICAL: Prepare full playlist in ExoPlayer
+        preparePlaylist()
+        // Play first song if available
         if (allSongs.isNotEmpty()) {
-            currentSong = allSongs[0]
-            updateSongInfo(currentSong!!)
+            playSong(allSongs[0])
         }
-        setupSearch()
     }
 
     private fun setupRecyclerView() {
@@ -179,21 +207,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        btnPrevious.setOnClickListener {
-            val playlist = getCurrentPlaylist()
-            val currentIndex = playlist.indexOf(currentSong)
-            if (currentIndex > 0) {
-                playSong(playlist[currentIndex - 1])
-            }
-        }
-
-        btnNext.setOnClickListener {
-            val playlist = getCurrentPlaylist()
-            val currentIndex = playlist.indexOf(currentSong)
-            if (currentIndex != -1 && currentIndex < playlist.size - 1) {
-                playSong(playlist[currentIndex + 1])
-            }
-        }
+        btnNext.setOnClickListener { player.seekToNext() }
+        btnPrevious.setOnClickListener { player.seekToPrevious() }
 
         btnRepeat.setOnClickListener {
             repeatMode = when (repeatMode) {
@@ -231,27 +246,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun playSong(song: Song) {
-        if (currentMediaId != song.audioUrl) {
-            currentMediaId = song.audioUrl
-            currentSong = song
-            updateSongInfo(song)
-
-            player.setMediaItem(MediaItem.fromUri(Uri.parse("file://${song.audioUrl}")))
-            player.prepare()
+    private fun preparePlaylist() {
+        val mediaItems = getCurrentPlaylist().map { song ->
+            MediaItem.fromUri(song.audioUrl)
         }
+        player.setMediaItems(mediaItems)
+        player.prepare()
+    }
 
-        player.play()
-        isPlaying = true
-        btnPlayPause.setImageResource(R.drawable.ic_pause)
+    private fun playSong(song: Song) {
+        val playlist = getCurrentPlaylist()
+        val index = playlist.indexOf(song)
+        if (index == -1) return
 
+        // Update UI
+        currentSong = song
+        updateSongInfo(song)
         adapter.updateNowPlaying(song.id)
+
+        // Tell ExoPlayer to play this item
+        if (player.playbackState == Player.STATE_IDLE) {
+            player.seekToDefaultPosition(index)
+            player.play()
+        } else {
+            player.seekTo(index, 0) // restart from beginning
+            if (!player.isPlaying) {
+                player.play()
+            }
+        }
     }
 
     private fun pauseSong() {
         player.pause()
         isPlaying = false
         btnPlayPause.setImageResource(R.drawable.ic_play)
+        stopProgressUpdate()
     }
 
     private fun updateSongInfo(song: Song) {
@@ -264,6 +293,24 @@ class MainActivity : AppCompatActivity() {
             .into(albumArt)
     }
 
+    private fun updateProgress() {
+        if (player.isPlaying) {
+            val duration = player.duration
+            val current = player.currentPosition
+            if (duration > 0) {
+                val progress = (current * 100 / duration).toInt()
+                progressBar.progress = progress
+            }
+        }
+    }
+
+    private fun startProgressUpdate() {
+        handler.post(updateProgressRunnable)
+    }
+
+    private fun stopProgressUpdate() {
+        handler.removeCallbacks(updateProgressRunnable)
+    }
 
     private fun updateRepeatIcon() {
         val (icon, message) = when (repeatMode) {
@@ -332,6 +379,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         player.release()
         mediaSession.release()
+        stopProgressUpdate()
     }
 
     fun View.setupHideKeyboardOnTouch() {
@@ -345,5 +393,32 @@ class MainActivity : AppCompatActivity() {
     private fun View.hideKeyboard() {
         val inputMethodManager = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         inputMethodManager.hideSoftInputFromWindow(windowToken, 0)
+    }
+
+    private fun setupProgressBarSeeking() {
+        progressBar.setOnTouchListener { _, event ->
+            if (player.duration <= 0) return@setOnTouchListener false
+
+            val x = event.x
+            val width = progressBar.width.toFloat()
+            if (width <= 0) return@setOnTouchListener false
+
+            val progress = (x / width).coerceIn(0f, 1f)
+            val newPosition = (progress * player.duration).toLong()
+
+            when (event.action) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    // Optional: show preview (not implemented here)
+                }
+                MotionEvent.ACTION_UP -> {
+                    player.seekTo(newPosition)
+                    // Resume playback if it was playing
+                    if (isPlaying) {
+                        player.play()
+                    }
+                }
+            }
+            true // consume touch
+        }
     }
 }
