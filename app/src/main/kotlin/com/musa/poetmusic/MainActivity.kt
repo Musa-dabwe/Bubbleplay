@@ -20,9 +20,13 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import android.widget.LinearLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.updatePadding
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -75,15 +79,18 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_main)
 
+        // Apply padding to main content so it doesn't clip under status bar
+        val mainContent = findViewById<LinearLayout>(R.id.mainContent)
+        ViewCompat.setOnApplyWindowInsetsListener(mainContent) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(top = systemBars.top)
+            insets
+        }
+
         setupUI()
         setupExoPlayer()
-        setupRecyclerView()
-        setupControls()
         setupProgressBarSeeking()
         requestPermission()
-
-        val rootView = findViewById<View>(android.R.id.content)
-        rootView.setupHideKeyboardOnTouch()
     }
 
     private fun setupUI() {
@@ -105,29 +112,23 @@ class MainActivity : AppCompatActivity() {
         player = ExoPlayer.Builder(this).build()
         mediaSession = MediaSession.Builder(this, player).build()
         player.addListener(object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                super.onMediaItemTransition(mediaItem, reason)
-                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
-                    val currentIndex = player.currentMediaItemIndex
-                    val playlist = getCurrentPlaylist()
-                    if (currentIndex in playlist.indices) {
-                        val newSong = playlist[currentIndex]
-                        currentSong = newSong
-                        updateSongInfo(newSong)
-                        adapter.updateNowPlaying(newSong.id)
-                        // Progress bar will auto-update via existing listener
+            override fun onPlaybackStateChanged(state: Int) {
+                when (state) {
+                    Player.STATE_READY -> {
+                        startProgressUpdate()
+                    }
+                    Player.STATE_ENDED -> {
+                        stopProgressUpdate()
+                        progressBar.progress = 0
                     }
                 }
             }
 
-            override fun onPlaybackStateChanged(state: Int) {
-                when (state) {
-                    Player.STATE_ENDED -> {
-                        // Only happens if REPEAT_MODE_OFF and last song ends
-                        isPlaying = false
-                        btnPlayPause.setImageResource(R.drawable.ic_play)
-                        stopProgressUpdate()
-                    }
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    startProgressUpdate()
+                } else {
+                    stopProgressUpdate()
                 }
             }
         })
@@ -136,17 +137,9 @@ class MainActivity : AppCompatActivity() {
     private fun loadSongs() {
         allSongs.clear()
         allSongs.addAll(SongRepository.getAllSongs(this))
-        // Reset shuffled list
         shuffledSongs = allSongs.toMutableList()
-        // Setup adapters
-        adapter = SongAdapter(getCurrentPlaylist(), ::playSong, null)
+        adapter = SongAdapter(allSongs, ::playSong, null)
         recyclerViewSongs.adapter = adapter
-        // ⚠️ CRITICAL: Prepare full playlist in ExoPlayer
-        preparePlaylist()
-        // Play first song if available
-        if (allSongs.isNotEmpty()) {
-            playSong(allSongs[0])
-        }
     }
 
     private fun setupRecyclerView() {
@@ -224,23 +217,16 @@ class MainActivity : AppCompatActivity() {
         btnShuffle.setOnClickListener {
             isShuffleEnabled = !isShuffleEnabled
             updateShuffleIcon()
-
             if (isShuffleEnabled) {
                 shuffledSongs = allSongs.shuffled().toMutableList()
             } else {
                 shuffledSongs = allSongs.toMutableList()
             }
-
-            adapter = SongAdapter(getCurrentPlaylist(), { song -> playSong(song) }, currentSong?.id)
+            adapter = SongAdapter(getCurrentPlaylist(), ::playSong, null)
             recyclerViewSongs.adapter = adapter
-
-            val newIndex = getCurrentPlaylist().indexOf(currentSong)
-            if (newIndex != -1) {
-                recyclerViewSongs.scrollToPosition(newIndex)
-            }
-
-            val message = if (isShuffleEnabled) "Shuffle on" else "Shuffle off"
-            val toast = Toast.makeText(this, message, Toast.LENGTH_SHORT)
+            // Re-prepare playlist if needed
+            preparePlaylist()
+            val toast = Toast.makeText(this, if (isShuffleEnabled) "Shuffle on" else "Shuffle off", Toast.LENGTH_SHORT)
             toast.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, 120)
             toast.show()
         }
@@ -255,25 +241,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playSong(song: Song) {
-        val playlist = getCurrentPlaylist()
-        val index = playlist.indexOf(song)
-        if (index == -1) return
-
-        // Update UI
+        if (currentSong == song && player.playbackState != Player.STATE_IDLE) {
+            // Already playing this song → resume
+            player.play()
+            isPlaying = true
+            btnPlayPause.setImageResource(R.drawable.ic_pause)
+            startProgressUpdate()
+            return
+        }
+        // New song → prepare and play
         currentSong = song
         updateSongInfo(song)
         adapter.updateNowPlaying(song.id)
-
-        // Tell ExoPlayer to play this item
-        if (player.playbackState == Player.STATE_IDLE) {
-            player.seekToDefaultPosition(index)
-            player.play()
-        } else {
-            player.seekTo(index, 0) // restart from beginning
-            if (!player.isPlaying) {
-                player.play()
-            }
-        }
+        val mediaItem = MediaItem.fromUri(song.audioUrl)
+        player.setMediaItem(mediaItem)
+        player.prepare()
+        player.play()
+        isPlaying = true
+        btnPlayPause.setImageResource(R.drawable.ic_pause)
+        startProgressUpdate()
     }
 
     private fun pauseSong() {
@@ -294,13 +280,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateProgress() {
-        if (player.isPlaying) {
-            val duration = player.duration
-            val current = player.currentPosition
-            if (duration > 0) {
-                val progress = (current * 100 / duration).toInt()
-                progressBar.progress = progress
-            }
+        if (player.duration > 0 && player.isPlaying) {
+            val progress = (player.currentPosition * 100 / player.duration).toInt()
+            progressBar.progress = progress
         }
     }
 
